@@ -1,12 +1,21 @@
 classdef NeuralLayer < matlab.mixin.SetGet
     % A single layer in a neural network
-    properties (GetAccess=private)%(GetAccess=private)
+    properties (GetAccess=private)
         W   % The weight matrix
         b   % The normalising vector
         Activation_function %funcname
         V_W % momentum vectors
         V_b
         act_functions = {'relu', 'softmax'};
+
+        % BatchNormalization variables
+        % ----------------------------
+        BatchNormalize_Var = false;
+        Train_Data_My;
+        Train_Data_v;
+        % ----------------------------
+
+
     end
     properties
         node_number;
@@ -27,41 +36,50 @@ classdef NeuralLayer < matlab.mixin.SetGet
 
 
             if any(strcmpi(Activation_function_input, obj.act_functions))
-                obj.Activation_function = Activation_function_input;
+                obj.Activation_function = lower(Activation_function_input);
             else
                 error('Activation function is not available in this version' );
             end
         end
-        function answer = eval(obj, Data)
-          answer = obj.W * double(Data) + obj.b;
-%           answer = activation(obj, s);
+        function s = eval(obj, Data)
+            W = obj.W;
+            b = obj.b;
+            s = W * double(Data) + repmat(b,1,size(Data,2));
         end
-        function answer = activation(obj, Data)
+        function ret = activation(obj, Data)
           if strcmp(obj.Activation_function, 'relu')
-            answer = obj.max(0,Data);
+            ret = max(0,Data);
           elseif strcmp(obj.Activation_function, 'softmax')
-            answer = obj.SOFTMAX(Data);
+            %SOFTMAX FUNCTION
+
+            e = exp(Data);
+            % one = ones(size(Data,1),1);
+            ret = bsxfun(@rdivide,e,sum(e));
+            % split = one'*e;
+            % ret = e/split(1,1);
           else
-            % Because of the check when setting activation methods this will
-            % never be returned
-            answer = Data;
+            error('Activation function is not available in this version' );
           end
         end
-        function ret = SOFTMAX(P)
-
-            e = exp(P);
-            one = ones(size(P,1),1);
-            split = one'*e;
-            ret = e/split(1,1);
+        function sumValue = WeightSum(obj)
+            sumValue = sum(sum(obj.W));
         end
-        
-        function g = backprop(obj, X_Data, Y_Data,G, P, S, GDparams)
+        function Value = BatchNormalize(obj, s)
+            s = double(s);
+            my = obj.Train_Data_My;
+            v = obj.Train_Data_v;
+
+            V = (sqrt(diag(v + 0.0000001)))^(-1);
+            var = (s - repmat(my,1,size(s,2)));
+            Value = V * var;
+        end
+        function g = BackPass(obj, Y_Data,G, P, S, GDparams)
           rho = GDparams{1};
           eta = GDparams{2};
           W = obj.W;
           b = obj.b;
 
-          [grad_W, grad_b, g] = obj.ComputeGradients(W, Y_Data,G, P, S, GDparams);
+          [grad_W, grad_b, g] = obj.ComputeGradients(Y_Data,G, P, S, GDparams{3});
           V_W = obj.V_W;
           V_b = obj.V_b;
           V_W = (rho.*V_W) + eta*grad_W;
@@ -71,22 +89,68 @@ classdef NeuralLayer < matlab.mixin.SetGet
           set(obj, 'V_b', V_b);
           set(obj, 'W', W - V_W);
           set(obj, 'b', b - V_b);
-
         end
-        function [grad_W, grad_b, g] = ComputeGradients(obj, Y_Data, G, P, S)
-          grad_W = 0;
-          grad_b = 0;
-          g = zeros(size(G));
-          for i = 1:size(Y_Data,2)
-            grad_b = grad_b + G(:,i);
-            grad_W = grad_W + (G(:,i)*P(:,i)');
+        function g = BatchNormBackPass(obj, Y_Data,G, P, S, GDparams)
+            rho = GDparams{1};
+            eta = GDparams{2};
+            W = obj.W;
+            b = obj.b;
 
-            next_layers_G = G(:,i)'*obj.W;
-            g(:,i) = (next_layers_G*diag((S(:,i)>0)))';
-          end
-          grad_b = grad_b./size(Y_Data,2);
-          grad_W = grad_W./size(Y_Data,2) + 2*lambda*obj.W;
+            [grad_W, grad_b, g] = obj.ComputeGradients(Y_Data, G, P, S, GDparams{3});
+            V_W = obj.V_W;
+            V_b = obj.V_b;
+            V_W = (rho.*V_W) + eta*grad_W;
+            V_b = (rho.*V_b) + eta*grad_b;
+
+            set(obj, 'V_W', V_W);
+            set(obj, 'V_b', V_b);
+            set(obj, 'W', W - V_W);
+            set(obj, 'b', b - V_b);
+        end
+        function [grad_W, grad_b, g] = ComputeGradients(obj, Y_Data, G, P, S, lambda)
+
+            grad_W = 0;
+            grad_b = 0;
+            W = obj.W;
+            g = zeros(size(S,1),size(Y_Data,2));
+
+            for i = 1:size(Y_Data,2)
+                grad_b = grad_b + G(:,i);
+                grad_W = grad_W + (G(:,i)*P(:,i)');
+
+                next_layers_G = G(:,i)' * W;
+                g(:,i) = (next_layers_G*diag((S(:,i)>0)))';
+            end
+            grad_b = grad_b./size(Y_Data,2);
+            grad_W = grad_W./size(Y_Data,2) + 2*lambda*W;
+        end
+        function Data = SetBatchNormalization(obj, X_Data, varargin)
+            Data = obj.activation(obj.eval(X_Data));
+            set(obj, 'BatchNormalize_Var', true);
+            if size(varargin) > 1
+                if any(strcmpi('my', varargin));
+                    str_index = find('my', lower(varargin));
+                    set(obj, 'Train_Data_My', varargin{str_index+1});
+                end
+                if any(strcmpi('v', varargin));
+                    str_index = find('v', lower(varargin));
+                    set(obj, 'Train_Data_v', varargin{str_index+1});
+                end
+            else
+                s = Data;
+                my = (1/size(s,2)).*sum(Data,2);
+                set(obj, 'Train_Data_My', my);
+                v = zeros(size(s,1),1);
+                for j = 1:size(s,1)
+                    sum_s = 0;
+                    for i = 1:size(s,2)
+                        sum_s = sum_s + ((s(j,i) - my(j))^2);
+                    end
+                    v(j) = (1/size(s,2))*sum_s;
+                end
+                set(obj, 'Train_Data_v', v);
+            end
+            % x = obj.activation(obj.eval(Data));
         end
     end
-
 end
