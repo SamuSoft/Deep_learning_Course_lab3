@@ -17,9 +17,13 @@
 % xlabel('loss');
 % ylabel('lambda');
 % zlabel('eta');
+
 hold on
-plot(1:40, real(Loss))
+for i = 1:20
+
+    plot(1:5, loss_list(:,i)');
+end
 xlabel('Epochs')
 ylabel('Loss')
-title('2-layers, 50 hidden nodes')
+title('3-layers, 50 hidden nodes')
 hold off

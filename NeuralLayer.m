@@ -90,23 +90,6 @@ classdef NeuralLayer < matlab.mixin.SetGet
           set(obj, 'W', W - V_W);
           set(obj, 'b', b - V_b);
         end
-        function g = BatchNormBackPass(obj, Y_Data,G, P, S, GDparams)
-            rho = GDparams{1};
-            eta = GDparams{2};
-            W = obj.W;
-            b = obj.b;
-
-            [grad_W, grad_b, g] = obj.ComputeGradients(Y_Data, G, P, S, GDparams{3});
-            V_W = obj.V_W;
-            V_b = obj.V_b;
-            V_W = (rho.*V_W) + eta*grad_W;
-            V_b = (rho.*V_b) + eta*grad_b;
-
-            set(obj, 'V_W', V_W);
-            set(obj, 'V_b', V_b);
-            set(obj, 'W', W - V_W);
-            set(obj, 'b', b - V_b);
-        end
         function [grad_W, grad_b, g] = ComputeGradients(obj, Y_Data, G, P, S, lambda)
 
             grad_W = 0;
@@ -140,17 +123,37 @@ classdef NeuralLayer < matlab.mixin.SetGet
                 s = Data;
                 my = (1/size(s,2)).*sum(Data,2);
                 set(obj, 'Train_Data_My', my);
-                v = zeros(size(s,1),1);
-                for j = 1:size(s,1)
-                    sum_s = 0;
-                    for i = 1:size(s,2)
-                        sum_s = sum_s + ((s(j,i) - my(j))^2);
-                    end
-                    v(j) = (1/size(s,2))*sum_s;
-                end
+%                 v = zeros(size(s,1),1);
+%                 for j = 1:size(s,1)
+%                     sum_s = 0;
+%                     for i = 1:size(s,2)
+%                         sum_s = sum_s + ((s(j,i) - my(j))^2);
+%                     end
+%                     v(j) = (1/size(s,2))*sum_s;
+%                 end
+                v = var(Data,0,2)*(size(Data,2)-1)/(size(Data,2));
                 set(obj, 'Train_Data_v', v);
             end
             % x = obj.activation(obj.eval(Data));
+        end
+
+        function W = getW(obj)
+            W = obj.W;
+        end
+        function b = getb(obj)
+            b = obj.b;
+        end
+        function setW(obj,W)
+            set(obj, 'W', W);
+        end
+        function setb(obj,b)
+            set(obj, 'b', b);
+        end
+
+        function layer = copyLayer(obj)
+          layer = NeuralLayer(obj.node_number,obj.input_dimension,obj.Activation_function, obj.standard_deviation);
+          layer.setW(obj.W);
+          layer.setb(obj.b);
         end
     end
 end
