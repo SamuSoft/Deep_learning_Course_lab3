@@ -32,7 +32,9 @@ train_X = double(train_X);
   Xtest = double(test_X) - repmat(mean_X, [1, size(test_X, 2)]);
   % ------------------------------------------------
 
-train_data = {train_X(:,1:100),train_Y(:,1:100)};
+train_size = 100;
+
+train_data = {train_X(:,1:train_size),train_Y(:,1:train_size)};
 % train_data = {train_X,train_Y};
 test_data = {test_X, test_Y};
 

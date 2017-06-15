@@ -32,14 +32,9 @@ classdef NeuralNetwork < matlab.mixin.SetGet
           fprintf('Epoch = 0');
           if any(strcmpi('BatchNormalize',varargin)) == 1
               set(obj,'BatchNormalize_Var',true);
-              X = X_Data;
-              for i = 1:(obj.network_size)
-                  X = obj.layer_list(i).SetBatchNormalization(X, varargin{:});
-              end
-
           end
           for i = 1:n_Epochs
-              train_datasets(obj, X_Data, Y_Data, i, GDparams);
+              train_datasets(obj, X_Data, Y_Data, i, GDparams, varargin{:});
               rho = .9*GDparams{1};
               GDparams = {rho, eta, lambda, n_Epochs, batch_size};
           end
@@ -59,16 +54,12 @@ classdef NeuralNetwork < matlab.mixin.SetGet
           if any(strcmpi('BatchNormalize',varargin)) == 1
               set(obj,'BatchNormalize_Var',true);
               disp('Initiating Batch Normalization');
-              X = X_Data;
-              for i = 1:(obj.network_size)
-                  X = obj.layer_list(i).SetBatchNormalization(X, varargin{:});
-              end
           end
 
           disp('Starting Mini Batch Gradient Decent');
           fprintf('Epoch = 0');
           for i = 1:n_Epochs
-              train_datasets(obj, X_Data, Y_Data, i, GDparams);
+              train_datasets(obj, X_Data, Y_Data, i, GDparams, varargin{:});
               rho = .9*GDparams{1};
               GDparams = {rho, eta, lambda, n_Epochs, batch_size};
               Loss(1,i) = obj.ComputeCost(Test_X, Test_y, GDparams{3});
@@ -154,10 +145,17 @@ classdef NeuralNetwork < matlab.mixin.SetGet
           obj.layer_list(1).BackPass(Y_Data,G, double(X_Data), X_Data, GDparams);
 
       end
-      function train_datasets(obj, X_Data, Y_Data, epoch, GDparams)
+      function train_datasets(obj, X_Data, Y_Data, epoch, GDparams, varargin)
         batch_Size = GDparams{5};
         for j = 1:1:(size(X_Data,2)/batch_Size)
-            obj.GradientDecent(X_Data(:,(((j-1)*batch_Size+1):j*batch_Size)), Y_Data(:,(((j-1)*batch_Size+1):j*batch_Size)), GDparams);
+          X_Batch = X_Data(:,(((j-1)*batch_Size+1):j*batch_Size));
+          Y_Batch = Y_Data(:,(((j-1)*batch_Size+1):j*batch_Size));
+            if obj.BatchNormalize_Var
+                for i = 1:(obj.network_size)
+                    X_Batch = obj.layer_list(i).SetBatchNormalization(X_Batch, varargin{:});
+                end
+            end
+            obj.GradientDecent(X_Batch, Y_Batch, GDparams);
         end
         if epoch < 11
             fprintf(' \b\b%d', epoch);
@@ -275,7 +273,7 @@ classdef NeuralNetwork < matlab.mixin.SetGet
 
             grad_W = zeros(size(W));
             grad_b = zeros(no, 1);
-
+            clock
 
 
             for i=1:length(b)
@@ -290,6 +288,7 @@ classdef NeuralNetwork < matlab.mixin.SetGet
                 c2 = obj.ComputeCost_ForNum(X, Y,W_layers,layers_try,lambda);
                 grad_b(i) = (c2-c1) / (2*h);
             end
+
             for i=1:numel(W)
                 layers_try = W_layers;
                 W_try = W;
@@ -302,6 +301,7 @@ classdef NeuralNetwork < matlab.mixin.SetGet
                 c2 = obj.ComputeCost_ForNum(X, Y, layers_try, b_layers, lambda);
                 grad_W(i) = (c2-c1) / (2*h);
             end
+
             obj.layer_list(k).setW(W - eta*grad_W);
             obj.layer_list(k).setb(b - eta*grad_b);
             W_layers{k} = W - eta*grad_W;

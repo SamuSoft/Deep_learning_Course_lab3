@@ -123,20 +123,22 @@ classdef NeuralLayer < matlab.mixin.SetGet
                 s = Data;
                 my = (1/size(s,2)).*sum(Data,2);
                 set(obj, 'Train_Data_My', my);
-%                 v = zeros(size(s,1),1);
-%                 for j = 1:size(s,1)
-%                     sum_s = 0;
-%                     for i = 1:size(s,2)
-%                         sum_s = sum_s + ((s(j,i) - my(j))^2);
-%                     end
-%                     v(j) = (1/size(s,2))*sum_s;
-%                 end
+                % v = zeros(size(s,1),1);
+                % for j = 1:size(s,1)
+                %     sum_s = 0;
+                %     for i = 1:size(s,2)
+                %         sum_s = sum_s + ((s(j,i) - my(j))^2);
+                %     end
+                %     v(j) = (1/size(s,2))*sum_s;
+                % end
                 v = var(Data,0,2)*(size(Data,2)-1)/(size(Data,2));
                 set(obj, 'Train_Data_v', v);
             end
             % x = obj.activation(obj.eval(Data));
         end
-
+        function ExpMoveBatch(obj, a)
+          my = obj.Train_Data_My;
+        end
         function W = getW(obj)
             W = obj.W;
         end
